@@ -105,7 +105,7 @@ def build_prompt(problems, shot_qids, test_qid, args):
     answer = get_answer(problems[test_qid], args.options)
     lecture = get_lecture_text(problems[test_qid])
     solution = get_solution_text(problems[test_qid])
-
+    
     test_example = create_one_example(args.prompt_format,
                                       question,
                                       context,

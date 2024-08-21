@@ -5,6 +5,7 @@ import argparse
 import random
 from tqdm import tqdm
 from base_prompt import *
+import NarrativeClarificationPrompting
 
 import logging
 import torch
@@ -16,6 +17,34 @@ import openai
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+
+json_schema_related_information = {
+    "type": "object",
+    "properties": {"related_information": {"type": "string"}}
+    }
+
+json_schema_narrative_clarification = {
+    "type": "object",
+    "properties": {"narrative_clarification": {"type": "string"}}
+    }
+
+json_schema_final_answer = {
+    "type": "object",
+    "properties": {
+        "Correct Option": {"type": "string"},
+        "choice value": {"type": "string"},
+        "explanation": {"type": "string"}
+        }
+    }
+
+def get_choice_text(probelm, options):
+    choices = probelm['choices']
+    choice_list = []
+    for i, c in enumerate(choices):
+        choice_list.append("({}) {}".format(options[i], c))
+    choice_txt = " ".join(choice_list)
+    #print(choice_txt)
+    return choice_txt
 
 def load_data(args):
     problems = json.load(open(os.path.join(args.data_root, 'problems.json')))
@@ -101,6 +130,16 @@ def run_llama3_prompting(tokenizer, model, messages, json_schema):
                             max_string_token_length=2000)
     response = jsonformer()
     return prompt, response
+
+def run_prompting(tokenizer, model, messages, json_schema):
+
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, return_tensors="pt")
+    jsonformer = Jsonformer(model, tokenizer, json_schema, prompt, max_number_tokens=2000,
+                            max_array_length=2000,
+                            max_string_token_length=2000)
+    response = jsonformer()
+
+    return(prompt, response)
 
 def get_llama3_result(prompt, model, tokenizer):
     json_schema = {
@@ -230,23 +269,62 @@ if __name__ == '__main__':
         results = {}
         outputs = {}
 
-    for i, qid in enumerate(qids):
-
+    for i, qid in enumerate(qids[:10]):
+        print("##New Question##")
         if qid in results:
             continue
 
         choices = problems[qid]["choices"]
         answer = problems[qid]["answer"]  # 0, 1, ..., 4
         label = args.options[answer]  # 'A', ..., 'E'
-        print("labels: ",label)
-        print("Choices: ",choices)
-        print("answer: ",answer)
+        # print("labels: ",label)
+        # print("Choices: ",choices)
+        # print("answer: ",answer)
 
-        prompt = build_prompt(problems, shot_qids, qid, args)  # Assuming build_prompt returns messages
+        question = problems[qid]['question']
+        choice = get_choice_text(problems[qid], args.options)
+
+        import pprint
+        # STEP 1    
+        messages_1 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_1(question)
+        prompt_1, response_1 = run_prompting(tokenizer, model, messages_1, json_schema_related_information)
+        print("Step 1 Prompt: ")
+        pprint.pprint(messages_1)
+        print("Response 1")
+        pprint.pprint(response_1)
+        # STEP 2
+        messages_2 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_2(question, response_1)
+        prompt_2, response_2 = run_prompting(tokenizer, model, messages_2, json_schema_narrative_clarification)
+        print("Step 2 Prompt: ")
+        pprint.pprint(messages_2)
+        print("Response 2")
+        pprint.pprint(response_2)
+        # STEP 3
+        messages_3 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_3(question, choice, response_2)
+        prompt_3, response_3 = run_prompting(tokenizer, model, messages_3, json_schema_final_answer)
+        print("Step 3 Prompt: ")
+        pprint.pprint(messages_3)
+        print("Response 3")
+        pprint.pprint(response_3)
+   
+
+        output = response_3["Correct Option"]
+        print(" \n ###final output: ",output)
+        print("\n")
+        # Adjusted regex pattern to capture the first letter and stop at non-letter characters (like a period or space)
+        pattern = re.compile(r'^[A-Z]')  # Matches the first uppercase letter at the beginning of the string
+        
+        res = pattern.findall(output)
+        
+        if len(res) == 1:
+            answer = res[0]  # 'A', 'B', ...
+        else:
+            answer = "FAILED"
+
+        #prompt = build_prompt(problems, shot_qids, qid, args)  # Assuming build_prompt returns messages
 
         # Generate prediction using llama3
-        prediction, output = get_llama3_result(prompt, model, tokenizer)
-        pred_idx = get_pred_idx(prediction, choices, args.options)
+        pred_idx = get_pred_idx(answer, choices, args.options)
 
         results[qid] = pred_idx
         outputs[qid] = output
@@ -256,11 +334,12 @@ if __name__ == '__main__':
         acc = correct / len(results) * 100
 
         if args.debug or i < 3:
-            print("##################################")
-            print("# labeled answer:", label)
-            print("# predicted answer:", prediction)
-            print("# predicted index:", pred_idx)
-            print("# predicted output:", output)
+            print("\n")
+            # print("##################################")
+            # print("# labeled answer:", label)
+            # print("# predicted answer:", answer)
+            # print("# predicted index:", pred_idx)
+            # print("# predicted output:", output)
 
         if (i + 1) % args.save_every == 0 or (i + 1) == len(qids):
             print(f"{len(results)}/{len(qids)}, correct: {correct}, acc: {round(acc, 2)}%, saving to {result_file}")
