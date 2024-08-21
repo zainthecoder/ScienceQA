@@ -269,7 +269,7 @@ if __name__ == '__main__':
         results = {}
         outputs = {}
 
-    for i, qid in enumerate(qids[:10]):
+    for i, qid in enumerate(qids):
         print("##New Question##")
         if qid in results:
             continue
@@ -288,24 +288,24 @@ if __name__ == '__main__':
         # STEP 1    
         messages_1 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_1(question)
         prompt_1, response_1 = run_prompting(tokenizer, model, messages_1, json_schema_related_information)
-        print("Step 1 Prompt: ")
-        pprint.pprint(messages_1)
-        print("Response 1")
-        pprint.pprint(response_1)
+        # print("Step 1 Prompt: ")
+        # pprint.pprint(messages_1)
+        # print("Response 1")
+        # pprint.pprint(response_1)
         # STEP 2
         messages_2 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_2(question, response_1)
         prompt_2, response_2 = run_prompting(tokenizer, model, messages_2, json_schema_narrative_clarification)
-        print("Step 2 Prompt: ")
-        pprint.pprint(messages_2)
-        print("Response 2")
-        pprint.pprint(response_2)
+        # print("Step 2 Prompt: ")
+        # pprint.pprint(messages_2)
+        # print("Response 2")
+        # pprint.pprint(response_2)
         # STEP 3
         messages_3 = NarrativeClarificationPrompting.meta_narrative_prompting.llama_3_prompt_creation_step_3(question, choice, response_2)
         prompt_3, response_3 = run_prompting(tokenizer, model, messages_3, json_schema_final_answer)
-        print("Step 3 Prompt: ")
-        pprint.pprint(messages_3)
-        print("Response 3")
-        pprint.pprint(response_3)
+        # print("Step 3 Prompt: ")
+        # pprint.pprint(messages_3)
+        # print("Response 3")
+        # pprint.pprint(response_3)
    
 
         output = response_3["Correct Option"]
