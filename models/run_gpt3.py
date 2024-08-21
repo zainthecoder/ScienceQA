@@ -317,14 +317,14 @@ if __name__ == '__main__':
         res = pattern.findall(output)
         
         if len(res) == 1:
-            answer = res[0]  # 'A', 'B', ...
+            predicted_option = res[0]  # 'A', 'B', ...
         else:
-            answer = "FAILED"
+            predicted_option = "FAILED"
 
         #prompt = build_prompt(problems, shot_qids, qid, args)  # Assuming build_prompt returns messages
 
         # Generate prediction using llama3
-        pred_idx = get_pred_idx(answer, choices, args.options)
+        pred_idx = get_pred_idx(predicted_option, choices, args.options)
 
         results[qid] = pred_idx
         outputs[qid] = output
@@ -336,10 +336,10 @@ if __name__ == '__main__':
         if args.debug or i < 3:
             print("\n")
             # print("##################################")
-            # print("# labeled answer:", label)
-            # print("# predicted answer:", answer)
-            # print("# predicted index:", pred_idx)
-            # print("# predicted output:", output)
+            print("# labeled answer:", label)
+            print("# predicted answer:", answer)
+            print("# predicted index:", pred_idx)
+            print("# predicted output:", output)
 
         if (i + 1) % args.save_every == 0 or (i + 1) == len(qids):
             print(f"{len(results)}/{len(qids)}, correct: {correct}, acc: {round(acc, 2)}%, saving to {result_file}")
